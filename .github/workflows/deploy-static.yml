@@ -28,4 +28,6 @@ jobs:
           prebuilt: '.'
           prod: true
 
-      - run: echo "Опубликовано: ${{ steps.deploy.outputs.url }}"
+      # Кавычки вокруг всей команды обязательны: без них YAML видит
+      # «двоеточие-пробел» внутри строки и считает это вложенным ключом.
+      - run: 'echo "Опубликовано — ${{ steps.deploy.outputs.url }}"'
