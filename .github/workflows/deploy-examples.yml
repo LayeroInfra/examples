@@ -1,0 +1,63 @@
+# Dogfood: все примеры публикуются на Layero нашим же GitHub Action.
+#
+# Сборка идёт ЗДЕСЬ, а на Layero уходит готовый артефакт (`prebuilt`). Это
+# намеренно: так workflow показывает ровно тот сценарий, ради которого Action
+# и нужен — когда сборке требуются секреты CI или приватные зависимости, и
+# связать репозиторий напрямую недостаточно. Статика идёт без шага сборки.
+#
+# matrix.fail-fast выключен: упавший пример не должен мешать выкатке
+# остальных — иначе одна сломанная зависимость гасит все живые демо.
+name: Deploy examples
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'vite-react/**'
+      - 'nextjs/**'
+      - 'astro/**'
+      - '.github/workflows/deploy-examples.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dir: vite-react
+            project: vite-react-example
+            output: dist
+          - dir: nextjs
+            project: nextjs-example
+            output: .next
+          - dir: astro
+            project: astro-example
+            output: dist
+    name: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: ${{ matrix.dir }}/package-lock.json
+
+      - run: npm ci
+        working-directory: ${{ matrix.dir }}
+
+      - run: npm run build
+        working-directory: ${{ matrix.dir }}
+
+      - uses: LayeroInfra/deploy-action@v1
+        id: deploy
+        with:
+          token: ${{ secrets.LAYERO_TOKEN }}
+          working-directory: ${{ matrix.dir }}
+          name: ${{ matrix.project }}
+          prebuilt: ${{ matrix.output }}
+          prod: true
+
+      - run: 'echo "${{ matrix.dir }} — ${{ steps.deploy.outputs.url }}"'
