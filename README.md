@@ -5,7 +5,7 @@
 > поддержка **Next.js / Vite / Astro / SvelteKit / Nuxt** и деплой прямо
 > из AI-агентов (**Cursor, Claude Code**).
 
-🌐 **Сайт:** <https://layero.ru>  ·  📚 **Документация:** <https://docs.layero.ru>  ·  📦 **npm:** <https://www.npmjs.com/package/layero>
+🌐 **Сайт:** <https://layero.ru>  ·  📚 **Документация:** <https://docs.layero.ru>  ·  📦 **npm:** <https://www.npmjs.com/package/layero>  ·  🧩 **Плагин для Claude Code:** <https://github.com/LayeroInfra/layero-claude>
 
 Готовые минимальные примеры — клонируй, зайди в папку и задеплой одной командой.
 
