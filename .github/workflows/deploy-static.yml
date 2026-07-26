@@ -24,7 +24,7 @@ jobs:
         with:
           token: ${{ secrets.LAYERO_TOKEN }}
           working-directory: static-html
-          project: examples-static-html
+          name: layero-example-static
           prebuilt: '.'
           prod: true
 
