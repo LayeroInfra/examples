@@ -1,0 +1,31 @@
+# Dogfood: примеры публикуются на Layero нашим же GitHub Action.
+#
+# Собирать в CI тут нечего — static-html это готовая папка, поэтому идём с
+# `prebuilt`. Для примеров со сборкой (vite-react, nextjs, astro) шаг сборки
+# добавляется перед деплоем — см. README Action.
+name: Deploy static example
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'static-html/**'
+      - '.github/workflows/deploy-static.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: LayeroInfra/deploy-action@v1
+        id: deploy
+        with:
+          token: ${{ secrets.LAYERO_TOKEN }}
+          working-directory: static-html
+          project: examples-static-html
+          prebuilt: '.'
+          prod: true
+
+      - run: echo "Опубликовано: ${{ steps.deploy.outputs.url }}"
