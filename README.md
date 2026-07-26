@@ -1,5 +1,7 @@
 # Layero Examples
 
+[![Deploy examples](https://github.com/LayeroInfra/examples/actions/workflows/deploy-examples.yml/badge.svg)](https://github.com/LayeroInfra/examples/actions/workflows/deploy-examples.yml)
+
 > **Layero** — российская платформа хостинга и деплоя фронтенд-приложений.
 > Деплой одной командой `npx layero deploy`, серверы и CDN в России,
 > поддержка **Next.js / Vite / Astro / SvelteKit / Nuxt** и деплой прямо
@@ -9,12 +11,16 @@
 
 Готовые минимальные примеры — клонируй, зайди в папку и задеплой одной командой.
 
-| Пример | Стек | Папка |
-|---|---|---|
-| Vite + React | SPA | [`vite-react/`](./vite-react) |
-| Next.js | SSR / App Router | [`nextjs/`](./nextjs) |
-| Astro | статика | [`astro/`](./astro) |
-| Plain HTML | статика без сборки | [`static-html/`](./static-html) |
+| Пример | Стек | Папка | Живой сайт |
+|---|---|---|---|
+| Vite + React | SPA | [`vite-react/`](./vite-react) | [vite-react-example.layero.app](https://vite-react-example.layero.app/) |
+| Next.js | SSR / App Router | [`nextjs/`](./nextjs) | [nextjs-example-4672fd.layero.app](https://nextjs-example-4672fd.layero.app/) |
+| Astro | статика | [`astro/`](./astro) | [astro-example.layero.app](https://astro-example.layero.app/) |
+| Plain HTML | статика без сборки | [`static-html/`](./static-html) | [static-html-example.layero.app](https://static-html-example.layero.app/) |
+
+Все четыре сайта выше — не скриншоты и не макеты: они собираются и
+публикуются из этого репозитория при каждом push, нашим же
+[GitHub Action](https://github.com/LayeroInfra/deploy-action).
 
 ## Деплой любого примера
 
@@ -29,6 +35,23 @@ Git и заранее настроенный CI не нужны — `npx layero 
 папку и собирает проект на стороне платформы.
 
 Подробнее про CLI и деплой из AI-агентов: <https://docs.layero.ru>.
+
+## Деплой из GitHub Actions
+
+Так же, как публикуются примеры в этом репозитории:
+
+```yaml
+- uses: LayeroInfra/deploy-action@v1
+  with:
+    token: ${{ secrets.LAYERO_TOKEN }}
+    prod: true
+```
+
+Токен создаётся на [app.layero.ru/settings/cli](https://app.layero.ru/settings/cli)
+и кладётся в секреты репозитория. Он бессрочный — в отличие от обычной сессии
+входа не протухает через неделю.
+
+Полное описание параметров — в [README самого Action](https://github.com/LayeroInfra/deploy-action).
 
 ---
 
