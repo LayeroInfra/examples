@@ -29,9 +29,12 @@ jobs:
           - dir: vite-react
             project: vite-react-example
             output: dist
+          # Next.js уезжает ИСХОДНИКАМИ, без prebuilt: `.next` — это не папка
+          # со статикой, там нет index.html. Layero поднимет его как runtime-
+          # приложение (SSR), что заодно и демонстрирует эту возможность.
           - dir: nextjs
             project: nextjs-example
-            output: .next
+            output: ''
           - dir: astro
             project: astro-example
             output: dist
