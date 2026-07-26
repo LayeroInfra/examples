@@ -16,6 +16,7 @@ on:
       - 'vite-react/**'
       - 'nextjs/**'
       - 'astro/**'
+      - 'static-html/**'
       - '.github/workflows/deploy-examples.yml'
   workflow_dispatch:
 
@@ -29,29 +30,43 @@ jobs:
           - dir: vite-react
             project: vite-react-example
             output: dist
+            build: true
           # Next.js уезжает ИСХОДНИКАМИ, без prebuilt: `.next` — это не папка
           # со статикой, там нет index.html. Layero поднимет его как runtime-
           # приложение (SSR), что заодно и демонстрирует эту возможность.
           - dir: nextjs
             project: nextjs-example
             output: ''
+            build: true
           - dir: astro
             project: astro-example
             output: dist
+            build: true
+          # Статика без сборки: ни package.json, ни шага build. Отдаём каталог
+          # как есть — `output: .`. Без флага `build` шаги установки и сборки
+          # ниже пропускаются, иначе `npm ci` упал бы на отсутствующем
+          # package.json и уронил бы весь пример.
+          - dir: static-html
+            project: static-html-example
+            output: .
+            build: false
     name: ${{ matrix.dir }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        if: matrix.build
         with:
           node-version: '20'
           cache: npm
           cache-dependency-path: ${{ matrix.dir }}/package-lock.json
 
       - run: npm ci
+        if: matrix.build
         working-directory: ${{ matrix.dir }}
 
       - run: npm run build
+        if: matrix.build
         working-directory: ${{ matrix.dir }}
 
       - uses: LayeroInfra/deploy-action@v1
