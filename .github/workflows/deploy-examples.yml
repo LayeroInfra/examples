@@ -35,7 +35,7 @@ jobs:
           # со статикой, там нет index.html. Layero поднимет его как runtime-
           # приложение (SSR), что заодно и демонстрирует эту возможность.
           - dir: nextjs
-            project: nextjs-example
+            project: nextjs-example-4672fd
             output: ''
             build: true
           - dir: astro
@@ -74,7 +74,13 @@ jobs:
         with:
           token: ${{ secrets.LAYERO_TOKEN }}
           working-directory: ${{ matrix.dir }}
-          name: ${{ matrix.project }}
+          # `project`, а НЕ `name`. `name` задаёт имя только при создании
+          # проекта на первом деплое — а первым он оказывается каждый раз:
+          # `.layero/project.json` в репозиторий не коммитится, привязке
+          # взяться неоткуда. За сутки так набежало 11 проектов на 4 примера,
+          # и ссылки в README устаревали после каждого push. `project` бьёт
+          # в конкретный существующий проект.
+          project: ${{ matrix.project }}
           prebuilt: ${{ matrix.output }}
           prod: true
 
