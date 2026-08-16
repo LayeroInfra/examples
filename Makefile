@@ -1,6 +1,6 @@
 .PHONY: help setup check build-all check-static
 
-BUILDABLE = astro nextjs vite-react
+BUILDABLE = astro nextjs vite-react storage-shelf
 
 help:
 	@echo "layero-examples — примеры приложений на Layero"

@@ -17,15 +17,20 @@
 | Next.js | SSR / App Router | [`nextjs/`](./nextjs) | [nextjs-example-4672fd.layero.app](https://nextjs-example-4672fd.layero.app/) |
 | Astro | статика | [`astro/`](./astro) | [astro-example.layero.app](https://astro-example.layero.app/) |
 | Plain HTML | статика без сборки | [`static-html/`](./static-html) | [static-html-example.layero.app](https://static-html-example.layero.app/) |
+| **Полка** — файлы | Vite + React, **Layero Storage** | [`storage-shelf/`](./storage-shelf) | [storage-shelf.layero.app](https://storage-shelf.layero.app/) |
 
-Все четыре сайта выше — не скриншоты и не макеты: они собираются и
-публикуются из этого репозитория при каждом push, нашим же
+Все сайты выше — не скриншоты и не макеты: они собираются и публикуются из
+этого репозитория, нашим же
 [GitHub Action](https://github.com/LayeroInfra/deploy-action).
+
+Первые четыре — минимальные заготовки: один файл, одна страница, взять и
+начать. **Полка** стоит особняком: это работающее приложение с базой,
+входом и файлами. Она показывает не «как задеплоить», а «как на этом жить».
 
 ## Деплой любого примера
 
 ```bash
-cd vite-react        # или nextjs / astro / static-html
+cd vite-react        # или nextjs / astro / static-html / storage-shelf
 npx layero@latest deploy
 ```
 
