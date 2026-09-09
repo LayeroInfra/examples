@@ -48,17 +48,33 @@
 
   <!-- вход -->
   <div class="card" id="gate">
-    <div class="row" style="margin-bottom:12px">
-      <button class="ghost" id="asPlayer">Я играю</button>
-      <button class="ghost" id="asHost">Я ведущий</button>
+    <div id="resume" class="hide" style="margin-bottom:14px"></div>
+    <div class="row">
+      <button id="btnNew">Провести игру</button>
+      <button class="ghost" id="btnJoin">Играть</button>
     </div>
-    <div id="form" class="hide">
+
+    <div id="newForm" class="hide" style="margin-top:16px">
       <div class="row">
-        <input id="code" placeholder="код игры, например 7538E9" style="max-width:220px">
-        <input id="who" placeholder="имя" style="max-width:260px">
+        <input id="title" value="Большая игра" style="max-width:320px">
+        <button id="create">Создать</button>
+      </div>
+      <details style="margin-top:10px">
+        <summary class="dim" style="cursor:pointer">свой пакет вопросов</summary>
+        <textarea id="pack" spellcheck="false" style="width:100%;height:150px;margin-top:8px;
+          background:#0b1020;color:var(--ink);border:1px solid var(--line);border-radius:10px;
+          padding:10px;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace"></textarea>
+      </details>
+      <div class="err" id="newErr"></div>
+    </div>
+
+    <div id="joinForm" class="hide" style="margin-top:16px">
+      <div class="row">
+        <input id="code" placeholder="код игры" style="max-width:200px;letter-spacing:2px;text-transform:uppercase">
+        <input id="who" placeholder="ваше имя" style="max-width:260px">
         <button id="go">Войти</button>
       </div>
-      <div class="err" id="gateErr"></div>
+      <div class="err" id="joinErr"></div>
     </div>
   </div>
 
@@ -81,7 +97,8 @@
   <div id="host" class="hide">
     <div class="card">
       <div class="row" style="justify-content:space-between">
-        <div>Код игры: <b id="hCode" style="color:var(--gold);letter-spacing:2px"></b></div>
+        <div>Код игры <b id="hCode" style="color:var(--gold);letter-spacing:4px;font-size:28px"></b>
+             <span class="dim">— назовите его участникам</span></div>
         <div class="dim"><span id="hPlayers">0</span> участников</div>
       </div>
       <div id="hStage" style="margin-top:12px" class="dim">Выберите клетку на доске.</div>
@@ -136,29 +153,220 @@ let role=null, code=null, token=null, skew=0, timer=null, lastCell=null;
 const $ = s => document.querySelector(s);
 const esc = s => String(s??"").replace(/[<>&]/g, c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
 
-$("#asPlayer").onclick = ()=>{ role="player"; $("#form").classList.remove("hide");
-  $("#who").placeholder="имя"; $("#who").classList.remove("hide"); };
-$("#asHost").onclick = ()=>{ role="host"; $("#form").classList.remove("hide");
-  $("#who").placeholder="токен ведущего"; };
+const DEFAULT_PACK = [
+ {
+  "theme": "Космос",
+  "cells": [
+   {
+    "value": 100,
+    "q": "Первый человек в космосе",
+    "a": "Гагарин"
+   },
+   {
+    "value": 200,
+    "q": "Планета, которую называют красной",
+    "a": "Марс"
+   },
+   {
+    "value": 300,
+    "q": "Естественный спутник Земли",
+    "a": "Луна"
+   },
+   {
+    "value": 400,
+    "q": "Галактика, в которой мы живём",
+    "a": "Млечный путь"
+   },
+   {
+    "value": 500,
+    "q": "Первая женщина в космосе",
+    "a": "Терешкова"
+   }
+  ]
+ },
+ {
+  "theme": "Базы данных",
+  "cells": [
+   {
+    "value": 100,
+    "q": "Язык запросов к реляционной базе",
+    "a": "SQL"
+   },
+   {
+    "value": 200,
+    "q": "Свойство транзакции, гарантирующее «всё или ничего»",
+    "a": "атомарность"
+   },
+   {
+    "value": 300,
+    "q": "Механизм Postgres, ограничивающий видимость строк по политике",
+    "a": "RLS"
+   },
+   {
+    "value": 400,
+    "q": "Что означает буква I в аббревиатуре ACID",
+    "a": "изоляция"
+   },
+   {
+    "value": 500,
+    "q": "Пулер соединений, который мы держим перед шардом",
+    "a": "pgbouncer"
+   }
+  ]
+ },
+ {
+  "theme": "Кино",
+  "cells": [
+   {
+    "value": 100,
+    "q": "Режиссёр «Сталкера»",
+    "a": "Тарковский"
+   },
+   {
+    "value": 200,
+    "q": "Город, где вручают «Оскар»",
+    "a": "Лос-Анджелес"
+   },
+   {
+    "value": 300,
+    "q": "Фильм, где герой просыпается 2 февраля снова и снова",
+    "a": "День сурка"
+   },
+   {
+    "value": 400,
+    "q": "Студия, снявшая «Историю игрушек»",
+    "a": "Pixar"
+   },
+   {
+    "value": 500,
+    "q": "Режиссёр «Соляриса» 2002 года",
+    "a": "Содерберг"
+   }
+  ]
+ },
+ {
+  "theme": "География",
+  "cells": [
+   {
+    "value": 100,
+    "q": "Самое глубокое озеро мира",
+    "a": "Байкал"
+   },
+   {
+    "value": 200,
+    "q": "Столица Австралии",
+    "a": "Канберра"
+   },
+   {
+    "value": 300,
+    "q": "Самая длинная река в мире",
+    "a": "Нил"
+   },
+   {
+    "value": 400,
+    "q": "Пролив между Азией и Америкой",
+    "a": "Берингов"
+   },
+   {
+    "value": 500,
+    "q": "Страна с наибольшим числом часовых поясов",
+    "a": "Франция"
+   }
+  ]
+ },
+ {
+  "theme": "Сети",
+  "cells": [
+   {
+    "value": 100,
+    "q": "Протокол, по которому браузер берёт страницу",
+    "a": "HTTP"
+   },
+   {
+    "value": 200,
+    "q": "Порт HTTPS по умолчанию",
+    "a": "443"
+   },
+   {
+    "value": 300,
+    "q": "Адрес метадата-сервиса облака",
+    "a": "169.254.169.254"
+   },
+   {
+    "value": 400,
+    "q": "Атака, подменяющая адрес между проверкой и подключением",
+    "a": "DNS rebinding"
+   },
+   {
+    "value": 500,
+    "q": "Заголовок, которым сервер разрешает запрос с чужого домена",
+    "a": "Access-Control-Allow-Origin"
+   }
+  ]
+ }
+];
+
+// Сессию помним у себя. Без этого обновление страницы выкидывало из игры
+// НАВСЕГДА: токен терялся, а войти заново мешало собственное имя — оно уже
+// занято тобой же. Ведущий при этом терял игру целиком: код и токен взять
+// было неоткуда.
+const keep = (k,v) => { try{ localStorage.setItem("bigshow:"+k, v); }catch(e){} };
+const held = k => { try{ return localStorage.getItem("bigshow:"+k); }catch(e){ return null; } };
+
+function enter(kind, c, t, label){
+  role = kind==="host" ? "host" : "player"; code = c; token = t;
+  keep("last", JSON.stringify({kind, code:c, token:t, label}));
+  keep(kind+":"+c, t);
+  $("#gate").classList.add("hide");
+  $("#"+(role==="player"?"player":"host")).classList.remove("hide");
+  if(role==="player" && label) $("#pName").textContent = label;
+  if(role==="host") $("#hCode").textContent = c;
+  poll();
+}
+
+$("#btnNew").onclick = ()=>{ $("#newForm").classList.remove("hide"); $("#joinForm").classList.add("hide");
+                             if(!$("#pack").value) $("#pack").value = JSON.stringify(DEFAULT_PACK, null, 1); };
+$("#btnJoin").onclick = ()=>{ $("#joinForm").classList.remove("hide"); $("#newForm").classList.add("hide"); };
+
+$("#create").onclick = async ()=>{
+  $("#newErr").textContent = ""; $("#create").disabled = true;
+  try{
+    let pack = DEFAULT_PACK;
+    const raw = $("#pack").value.trim();
+    if(raw){ try{ pack = JSON.parse(raw); }catch(e){ throw new Error("пакет не разобрался как JSON"); } }
+    const g = await rpc("quiz_new", {p_title:$("#title").value.trim(), p_pack:pack});
+    $("#sub").textContent = g.title + " · вопросов: " + g.cells;
+    enter("host", g.code, g.operator_token);
+  }catch(e){ $("#newErr").textContent = e.message; $("#create").disabled = false; }
+};
 
 $("#go").onclick = async ()=>{
-  $("#gateErr").textContent = "";
-  code = $("#code").value.trim().toUpperCase();
+  $("#joinErr").textContent = ""; $("#go").disabled = true;
+  const c = $("#code").value.trim().toUpperCase();
   try{
-    if(role==="player"){
-      const j = await rpc("quiz_join", {p_code:code, p_name:$("#who").value.trim()});
-      token = j.player_token; $("#pName").textContent = j.name;
-      $("#sub").textContent = j.title;
-    } else {
-      token = $("#who").value.trim();
-      const b = await rpc("quiz_board", {p_code:code, p_op:token});
-      $("#hCode").textContent = b.code; $("#sub").textContent = b.title;
-    }
-    $("#gate").classList.add("hide");
-    $("#"+(role==="player"?"player":"host")).classList.remove("hide");
-    poll();
-  }catch(e){ $("#gateErr").textContent = e.message; }
+    // Уже играли под этим кодом — возвращаемся собой, а не заводим двойника
+    // и не упираемся в «имя занято» собственным же именем.
+    const mine = held("player:"+c);
+    if(mine){ const st = await rpc("quiz_state", {p_code:c, p_token:mine});
+              $("#sub").textContent = st.title; enter("player", c, mine, st.me.name); return; }
+    const j = await rpc("quiz_join", {p_code:c, p_name:$("#who").value.trim()});
+    $("#sub").textContent = j.title;
+    enter("player", c, j.player_token, j.name);
+  }catch(e){ $("#joinErr").textContent = e.message; $("#go").disabled = false; }
 };
+
+// Возврат в свою игру — кнопкой, а не переписыванием токена руками.
+(function(){
+  const raw = held("last"); if(!raw) return;
+  let v; try{ v = JSON.parse(raw); }catch(e){ return; }
+  if(!v || !v.code || !v.token) return;
+  $("#resume").classList.remove("hide");
+  $("#resume").innerHTML = `<div class="dim" style="margin-bottom:8px">Вы уже ` +
+    `${v.kind==="host"?"ведёте":"играете в"} игру ` +
+    `<b style="color:var(--gold);letter-spacing:2px">${esc(v.code)}</b></div>` +
+    `<button id="btnResume">Вернуться</button>`;
+  $("#btnResume").onclick = ()=> enter(v.kind, v.code, v.token, v.label);
+})();
 
 // 🚨 Опрос ПОДГАДЫВАЕТСЯ К МОМЕНТУ ПОКАЗА, а не идёт равномерно. Пока ничего
 // не открыто — раз в 2,5 секунды, дёшево. Как только известно `reveal_at`,
