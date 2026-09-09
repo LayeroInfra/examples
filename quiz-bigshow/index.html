@@ -1,0 +1,293 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Большая игра</title>
+<style>
+  :root{
+    --bg:#0d1220; --panel:#161e33; --line:#26314f; --ink:#eef2ff; --dim:#93a0c4;
+    --gold:#f5c518; --ok:#3ddc97; --no:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1100px;margin:0 auto;padding:20px}
+  h1{font-size:24px;margin:0 0 4px}
+  .dim{color:var(--dim)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin:14px 0}
+  input,button{font:inherit;border-radius:10px;border:1px solid var(--line)}
+  input{background:#0b1020;color:var(--ink);padding:10px 12px;width:100%}
+  button{background:var(--gold);color:#1a1200;border:0;padding:11px 18px;font-weight:650;cursor:pointer}
+  button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+  button:disabled{opacity:.45;cursor:default}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .grid{display:grid;gap:8px;grid-template-columns:repeat(var(--cols),1fr)}
+  .th{font-weight:650;text-align:center;padding:10px 6px;color:var(--gold);
+      border-bottom:1px solid var(--line);font-size:14px}
+  .cell{background:#1b2440;border:1px solid var(--line);border-radius:10px;
+        padding:16px 6px;text-align:center;font-size:22px;font-weight:700;color:var(--gold)}
+  .cell.can{cursor:pointer}
+  .cell.can:hover{background:#243156}
+  .cell.done{color:#3b466a;background:#121a2e}
+  .cell.open{outline:2px solid var(--gold)}
+  .q{font-size:clamp(22px,3.4vw,38px);font-weight:650;line-height:1.25;margin:6px 0 2px}
+  .count{font-size:clamp(44px,9vw,90px);font-weight:800;color:var(--gold);text-align:center;
+         font-variant-numeric:tabular-nums;letter-spacing:-2px}
+  table{width:100%;border-collapse:collapse}
+  td,th{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}
+  th{color:var(--dim);font-weight:500}
+  .tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px}
+  .tag.ok{background:rgba(61,220,151,.14);color:var(--ok)}
+  .tag.no{background:rgba(255,107,107,.14);color:var(--no)}
+  .err{color:var(--no);min-height:20px;font-size:14px}
+  .hide{display:none}
+</style>
+
+<div class="wrap">
+  <h1>Большая игра</h1>
+  <div class="dim" id="sub">темы × номиналы · данные живут в Layero Data API</div>
+
+  <!-- вход -->
+  <div class="card" id="gate">
+    <div class="row" style="margin-bottom:12px">
+      <button class="ghost" id="asPlayer">Я играю</button>
+      <button class="ghost" id="asHost">Я ведущий</button>
+    </div>
+    <div id="form" class="hide">
+      <div class="row">
+        <input id="code" placeholder="код игры, например 7538E9" style="max-width:220px">
+        <input id="who" placeholder="имя" style="max-width:260px">
+        <button id="go">Войти</button>
+      </div>
+      <div class="err" id="gateErr"></div>
+    </div>
+  </div>
+
+  <!-- игрок -->
+  <div id="player" class="hide">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div><b id="pName"></b> <span class="dim">·</span> <span id="pScore" class="dim">0</span></div>
+        <div class="dim" id="pStatus">ждём ведущего</div>
+      </div>
+      <div id="pStage" style="margin-top:14px">
+        <div class="dim">Ведущий ещё не открыл вопрос.</div>
+      </div>
+    </div>
+    <div class="card"><div class="dim" style="margin-bottom:8px">Доска</div><div id="pBoard"></div></div>
+    <div class="card"><div class="dim" style="margin-bottom:8px">Счёт</div><div id="pScores"></div></div>
+  </div>
+
+  <!-- ведущий -->
+  <div id="host" class="hide">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div>Код игры: <b id="hCode" style="color:var(--gold);letter-spacing:2px"></b></div>
+        <div class="dim"><span id="hPlayers">0</span> участников</div>
+      </div>
+      <div id="hStage" style="margin-top:12px" class="dim">Выберите клетку на доске.</div>
+      <div class="row" style="margin-top:12px">
+        <button id="hClose" disabled>Закрыть и начислить</button>
+        <span class="dim">задержка показа</span>
+        <input id="hDelay" value="3000" style="max-width:90px">
+        <span class="dim">мс</span>
+      </div>
+      <div class="err" id="hErr"></div>
+    </div>
+    <div class="card"><div id="hBoard"></div></div>
+    <div class="card"><div class="dim" style="margin-bottom:8px">Ответы на текущий вопрос</div><div id="hAnswers"></div></div>
+    <div class="card"><div class="dim" style="margin-bottom:8px">Счёт</div><div id="hScores"></div></div>
+  </div>
+</div>
+
+<script>
+const BASE = "https://data.layero.ru/polka";
+const KEY  = "pk_live_-VnaGRCRDnUuKODv2Kx_DNqlztXuqJgsWzg02Qe83t8";
+
+const sleep = ms => new Promise(r=>setTimeout(r, ms));
+
+// 🚨 ДВА ОТКАЗА — ДВА РАЗНЫХ ОТСТУПА, и путать их дорого.
+//
+// 503 — обратное давление шлюза: он отказывает СРАЗУ и намеренно, потому что
+// очередь на исчерпанной ёмкости превращает всплеск в лавину. Очередь должна
+// жить здесь, у клиента, и повтор через десятки миллисекунд уместен.
+//
+// 429 — ведро частоты на edge переполнено, и оно общее на ВЕСЬ адрес. Комната
+// за одним Wi-Fi — это один адрес на всех: замер 09.09 показал, что сто
+// участников из одной сети дают 1020 отказов, если повторять часто. Быстрый
+// повтор здесь не помогает получить ответ, он только доливает в полное ведро.
+async function rpc(fn, args, tries=6){
+  for(let i=0;;i++){
+    const r = await fetch(`${BASE}/rpc/${fn}`, {
+      method:"POST", headers:{apikey:KEY, "content-type":"application/json"},
+      body: JSON.stringify(args)
+    });
+    if(r.ok) return (await r.json()).data;
+    const retry = (r.status===503 || r.status===429) && i < tries;
+    if(!retry){
+      const j = await r.json().catch(()=>({}));
+      throw new Error(j.message || `ошибка ${r.status}`);
+    }
+    await sleep(r.status===429 ? 400 + Math.random()*700 + i*250
+                               : 60  + Math.random()*90);
+  }
+}
+
+let role=null, code=null, token=null, skew=0, timer=null, lastCell=null;
+const $ = s => document.querySelector(s);
+const esc = s => String(s??"").replace(/[<>&]/g, c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+
+$("#asPlayer").onclick = ()=>{ role="player"; $("#form").classList.remove("hide");
+  $("#who").placeholder="имя"; $("#who").classList.remove("hide"); };
+$("#asHost").onclick = ()=>{ role="host"; $("#form").classList.remove("hide");
+  $("#who").placeholder="токен ведущего"; };
+
+$("#go").onclick = async ()=>{
+  $("#gateErr").textContent = "";
+  code = $("#code").value.trim().toUpperCase();
+  try{
+    if(role==="player"){
+      const j = await rpc("quiz_join", {p_code:code, p_name:$("#who").value.trim()});
+      token = j.player_token; $("#pName").textContent = j.name;
+      $("#sub").textContent = j.title;
+    } else {
+      token = $("#who").value.trim();
+      const b = await rpc("quiz_board", {p_code:code, p_op:token});
+      $("#hCode").textContent = b.code; $("#sub").textContent = b.title;
+    }
+    $("#gate").classList.add("hide");
+    $("#"+(role==="player"?"player":"host")).classList.remove("hide");
+    poll();
+  }catch(e){ $("#gateErr").textContent = e.message; }
+};
+
+// 🚨 Опрос ПОДГАДЫВАЕТСЯ К МОМЕНТУ ПОКАЗА, а не идёт равномерно. Пока ничего
+// не открыто — раз в 2,5 секунды, дёшево. Как только известно `reveal_at`,
+// следующий запрос назначается ровно на него: тогда вопрос приходит всем
+// в одном окне в полсотни миллисекунд, а не «когда чей опрос подошёл».
+function schedule(s){
+  clearTimeout(timer);
+  skew = Date.now() - Date.parse(s.server_now);
+  let ms = 2500 + Math.random()*600;
+  if(s.reveal_at && !s.revealed){
+    // Разброс 0–150 мс, чтобы сотня браузеров не пришла одной микросекундой.
+    ms = Math.max(60, Date.parse(s.reveal_at) + skew - Date.now() + 60 + Math.random()*150);
+  }
+  timer = setTimeout(poll, ms);
+}
+
+function board(el, b, onClick){
+  if(!b || !b.length) return;
+  const rows = Math.max(...b.map(t=>t.cells.length));
+  el.style.setProperty("--cols", b.length);
+  let h = '<div class="grid">' + b.map(t=>`<div class="th">${esc(t.theme)}</div>`).join("");
+  for(let i=0;i<rows;i++) h += b.map(t=>{
+    const c = t.cells[i]; if(!c) return '<div></div>';
+    const cls = c.state==="done" ? "done" : (c.state==="open" ? "open" : (onClick?"can":""));
+    return `<div class="cell ${cls}" data-id="${c.id}">${c.state==="done"?"—":c.value}</div>`;
+  }).join("");
+  el.innerHTML = h + "</div>";
+  if(onClick) el.querySelectorAll(".cell.can").forEach(d=>d.onclick=()=>onClick(d.dataset.id));
+}
+
+const scoreTable = rows => `<table><tr><th>Игрок</th><th style="text-align:right">Очки</th></tr>` +
+  (rows.length?rows:[{name:"—",score:0}]).map(r=>
+    `<tr><td>${esc(r.name)}</td><td style="text-align:right"><b>${r.score}</b></td></tr>`).join("") + "</table>";
+
+async function poll(){
+  try{ role==="player" ? await tickPlayer() : await tickHost(); }
+  catch(e){ clearTimeout(timer); timer = setTimeout(poll, 2000); }
+}
+
+// Полное состояние (доска, счета, моё) — ЛЕНИВО. В момент показа оно не
+// меняется, а стоит четырёх агрегатов по всей игре: платить ими залпом за
+// одну строку с вопросом было главной ошибкой первой редакции.
+let full = null, fullAt = 0;
+
+async function tickPlayer(){
+  const w = await rpc("quiz_watch", {p_code:code});
+  const nearReveal = w.reveal_at && Math.abs(Date.parse(w.reveal_at) + skew - Date.now()) < 1500;
+  if(!full || (!nearReveal && Date.now() - fullAt > 4000)){
+    full = await rpc("quiz_state", {p_code:code, p_token:token});
+    fullAt = Date.now();
+  }
+  // Вопрос — из лёгкой ручки, остальное — из ленивой.
+  const s = {...full, server_now:w.server_now, reveal_at:w.reveal_at, revealed:w.revealed,
+             cell: w.cell ? {...w.cell, answered: full.cell && full.cell.id===w.cell.id
+                                                  ? full.cell.answered : false} : null};
+  $("#pScore").textContent = s.me.score + " очков";
+  $("#pScores").innerHTML = scoreTable(s.scores||[]);
+  board($("#pBoard"), s.board, null);
+  const st = $("#pStage");
+  if(!s.cell){ st.innerHTML = '<div class="dim">Ведущий ещё не открыл вопрос.</div>';
+               $("#pStatus").textContent = "ждём ведущего"; }
+  else if(!s.revealed){
+    $("#pStatus").textContent = `${s.cell.theme} · ${s.cell.value}`;
+    st.innerHTML = '<div class="dim" style="text-align:center">Вопрос откроется через</div><div class="count" id="cd">—</div>';
+    const target = Date.parse(s.reveal_at) + skew;
+    const tick = ()=>{ const left = target - Date.now();
+      const el = $("#cd"); if(!el) return;
+      el.textContent = left>0 ? (left/1000).toFixed(1) : "0.0";
+      if(left>0) requestAnimationFrame(tick); };
+    tick();
+  } else {
+    $("#pStatus").textContent = `${s.cell.theme} · ${s.cell.value}`;
+    if(s.cell.answered){
+      st.innerHTML = `<div class="q">${esc(s.cell.question)}</div><div class="dim">Ответ принят. Ждём остальных.</div>`;
+    } else if(lastCell !== s.cell.id || !$("#ans")){
+      lastCell = s.cell.id;
+      st.innerHTML = `<div class="q">${esc(s.cell.question)}</div>
+        <div class="row" style="margin-top:12px">
+          <input id="ans" placeholder="ваш ответ" style="max-width:420px" autofocus>
+          <button id="send">Ответить</button></div><div class="err" id="ansErr"></div>`;
+      const send = async ()=>{
+        $("#send").disabled = true;
+        try{ const r = await rpc("quiz_answer", {p_code:code, p_token:token, p_text:$("#ans").value});
+             $("#pStage").innerHTML = `<div class="q">${esc(s.cell.question)}</div>
+               <div class="dim">Ответ принят за ${(r.ms/1000).toFixed(2)} с.</div>`;
+             fullAt = 0; }
+        catch(e){ $("#ansErr").textContent = e.message; $("#send").disabled = false; }
+      };
+      $("#send").onclick = send;
+      $("#ans").onkeydown = e => { if(e.key==="Enter") send(); };
+      $("#ans").focus();
+    }
+  }
+  schedule(s);
+}
+
+async function tickHost(){
+  const b = await rpc("quiz_board", {p_code:code, p_op:token});
+  $("#hPlayers").textContent = b.players;
+  $("#hScores").innerHTML = scoreTable(b.scores||[]);
+  $("#hClose").disabled = !b.current_cell;
+  board($("#hBoard"), b.board, async id => {
+    $("#hErr").textContent = "";
+    $("#hErr").style.color = "var(--no)";
+    try{ await rpc("quiz_open", {p_code:code, p_op:token, p_cell:id,
+                                p_delay_ms:parseInt($("#hDelay").value,10)||3000}); poll(); }
+    catch(e){ $("#hErr").textContent = e.message; }
+  });
+  const cur = b.board?.flatMap(t=>t.cells.map(c=>({...c, theme:t.theme})))
+                      .find(c=>c.id===b.current_cell);
+  $("#hStage").innerHTML = cur
+    ? `<div class="dim">${esc(cur.theme)} · ${cur.value}${b.revealed?" · показан":" · показ через мгновение"}</div>
+       <div class="q">${esc(cur.question)}</div>
+       <div style="color:var(--ok);font-weight:650">Ответ: ${esc(cur.answer)}</div>`
+    : '<div class="dim">Выберите клетку на доске.</div>';
+  $("#hAnswers").innerHTML = (b.answers||[]).length
+    ? `<table><tr><th>Игрок</th><th>Ответ</th><th>Время</th><th></th></tr>` + b.answers.map(a=>
+        `<tr><td>${esc(a.name)}</td><td>${esc(a.text)}</td><td>${(a.ms/1000).toFixed(2)} с</td>
+         <td><span class="tag ${a.correct?"ok":"no"}">${a.correct?"верно":"мимо"}</span></td></tr>`).join("") + "</table>"
+    : '<div class="dim">Пока никто не ответил.</div>';
+  schedule(b);
+}
+
+$("#hClose").onclick = async ()=>{
+  try{ const r = await rpc("quiz_close", {p_code:code, p_op:token});
+       // Итог — не ошибка, и красным он читался бы как поломка.
+       $("#hErr").style.color = "var(--ok)";
+       $("#hErr").textContent = `Правильный ответ: ${r.answer}. Начислено: ${r.awarded}. Осталось клеток: ${r.left}.`;
+       poll(); }
+  catch(e){ $("#hErr").style.color = "var(--no)"; $("#hErr").textContent = e.message; }
+};
+</script>

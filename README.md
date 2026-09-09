@@ -18,6 +18,7 @@
 | Astro | статика | [`astro/`](./astro) | [astro-example.layero.app](https://astro-example.layero.app/) |
 | Plain HTML | статика без сборки | [`static-html/`](./static-html) | [static-html-example.layero.app](https://static-html-example.layero.app/) |
 | **Полка** — файлы | Vite + React, **Layero Storage** | [`storage-shelf/`](./storage-shelf) | [storage-shelf.layero.app](https://storage-shelf.layero.app/) |
+| **Большая игра** — квиз | HTML без сборки, **Layero Data API** | [`quiz-bigshow/`](./quiz-bigshow) | [quiz-bigshow.layero.app](https://quiz-bigshow.layero.app/) |
 
 Все сайты выше — не скриншоты и не макеты: они собираются и публикуются из
 этого репозитория, нашим же
@@ -26,6 +27,11 @@
 Первые четыре — минимальные заготовки: один файл, одна страница, взять и
 начать. **Полка** стоит особняком: это работающее приложение с базой,
 входом и файлами. Она показывает не «как задеплоить», а «как на этом жить».
+
+**Большая игра** — квиз «темы × номиналы»: ведущий открывает клетку, участники
+видят вопрос одновременно, счёт считает база. Бэкенда нет вовсе — только
+функции в базе и один `index.html`. Она отвечает на вопрос, который задают
+чаще всего: можно ли на Data API сделать что-то живое, а не карточки товаров.
 
 ## Деплой любого примера
 
