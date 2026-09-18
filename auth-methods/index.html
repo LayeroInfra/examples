@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка входа — Layero</title>
+<style>
+  :root { --ink:#16181d; --muted:#6b7280; --line:#e4e5e9; --ok:#0f7b4a; --bad:#b42318; --bg:#f7f7f5; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:var(--bg); }
+  main { max-width: 640px; margin: 40px auto; padding: 0 20px; display:flex; flex-direction:column; gap:16px; }
+  h1 { font-size: 22px; margin:0; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:12px; }
+  .muted { color:var(--muted); font-size:13px; }
+  label { display:flex; flex-direction:column; gap:4px; font-size:13px; color:var(--muted); }
+  input { font:inherit; padding:9px 11px; border:1px solid var(--line); border-radius:8px; color:var(--ink); }
+  input:focus-visible, button:focus-visible { outline:2px solid #2563eb; outline-offset:1px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; }
+  button { font:inherit; padding:9px 14px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff; cursor:pointer; }
+  button.ghost { background:#fff; color:var(--ink); border-color:var(--line); }
+  button:disabled { opacity:.5; cursor:default; }
+  pre { margin:0; background:#101216; color:#d6dae3; padding:12px; border-radius:8px; font-size:12px; overflow-x:auto; white-space:pre-wrap; word-break:break-word; max-height:320px; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); }
+  #qr img { width:180px; height:180px; }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <h1 id="title">Проверка входа</h1>
+    <div class="muted" id="subtitle"></div>
+  </div>
+
+  <section class="card" id="state">
+    <div id="who">Загрузка…</div>
+    <div class="row" id="session-actions" hidden>
+      <button class="ghost" id="refresh">Продлить сессию</button>
+      <button class="ghost" id="logout">Выйти</button>
+    </div>
+  </section>
+
+  <section class="card" id="form" hidden></section>
+
+  <section class="card" id="mfa" hidden>
+    <strong>Второй фактор</strong>
+    <div class="muted">Работает у вошедшего. Нужен включённый «второй фактор» у базы.</div>
+    <div class="row">
+      <button class="ghost" id="mfa-enroll">Подключить</button>
+      <button class="ghost" id="mfa-list">Мои факторы</button>
+    </div>
+    <div id="qr"></div>
+    <label id="mfa-code-wrap" hidden>Код из приложения
+      <input id="mfa-code" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
+    </label>
+    <div class="row" id="mfa-verify-row" hidden><button id="mfa-verify">Подтвердить код</button></div>
+  </section>
+
+  <section class="card">
+    <strong>Журнал</strong>
+    <pre id="log" aria-live="polite"></pre>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const logEl = $("log");
+function log(title, data, bad) {
+  const line = `[${new Date().toLocaleTimeString("ru-RU")}] ${bad ? "✗" : "✓"} ${title}` +
+    (data === undefined ? "" : "\n" + (typeof data === "string" ? data : JSON.stringify(data, null, 2)));
+  logEl.textContent = line + "\n\n" + logEl.textContent;
+}
+function report(title, res) {
+  if (res && res.error) { log(title, { code: res.error.code, status: res.error.status, message: res.error.message }, true); return false; }
+  log(title, res && res.data ? trim(res.data) : undefined); return true;
+}
+function trim(data) {
+  const s = data.session;
+  return { user: (data.user || (s && s.user) || {}).email, session: s ? { expires_in: s.expires_in, aal: claims(s.access_token).aal } : null };
+}
+function claims(jwt) { try { return JSON.parse(atob(jwt.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))); } catch { return {}; } }
+
+const TITLES = {
+  password: ["Почта и пароль", "Регистрация, вход и сброс пароля."],
+  link: ["Ссылка из письма", "Вход без пароля: письмо со ссылкой возвращает сюда уже вошедшим."],
+  code: ["Код из письма", "Вход без пароля: шесть цифр из письма."],
+  yandex: ["Яндекс", "Вход через Яндекс ID."],
+  vkid: ["VK ID", "Вход через VK ID."],
+  sber: ["Сбер ID", "Вход через Сбер ID."],
+};
+
+let sb, cfg, factorId;
+
+function field(id, label, type, extra) {
+  return `<label>${label}<input id="${id}" type="${type}" ${extra || ""}></label>`;
+}
+function renderForm() {
+  const f = $("form"), m = cfg.method;
+  const email = field("email", "Почта", "email", 'autocomplete="email"');
+  if (m === "password") f.innerHTML = email + field("password", "Пароль", "password", 'autocomplete="current-password"') +
+    `<div class="row"><button id="signin">Войти</button><button class="ghost" id="signup">Зарегистрироваться</button><button class="ghost" id="recover">Сбросить пароль</button></div>
+     <div id="newpass" hidden>${field("password2", "Новый пароль", "password", 'autocomplete="new-password"')}<div class="row" style="margin-top:8px"><button id="setpass">Сохранить пароль</button></div></div>`;
+  else if (m === "link") f.innerHTML = email + `<div class="row"><button id="sendlink">Прислать ссылку</button></div>`;
+  else if (m === "code") f.innerHTML = email + `<div class="row"><button id="sendcode">Прислать код</button></div>` +
+    field("otp", "Код из письма", "text", 'inputmode="numeric" maxlength="6" autocomplete="one-time-code"') + `<div class="row"><button id="verifycode">Войти по коду</button></div>`;
+  else f.innerHTML = `<div class="row"><button id="oauth">Войти через ${TITLES[m][0]}</button></div>`;
+  f.hidden = false;
+
+  const v = (id) => ($(id) ? $(id).value.trim() : "");
+  const here = location.origin + location.pathname;
+  const on = (id, fn) => $(id) && $(id).addEventListener("click", async (e) => { e.target.disabled = true; try { await fn(); } catch (err) { log(id, String(err), true); } e.target.disabled = false; });
+  on("signin", async () => report("Вход по паролю", await sb.auth.signInWithPassword({ email: v("email"), password: v("password") })));
+  on("signup", async () => report("Регистрация", await sb.auth.signUp({ email: v("email"), password: v("password"), options: { emailRedirectTo: here } })));
+  on("recover", async () => report("Письмо для сброса пароля", await sb.auth.resetPasswordForEmail(v("email"), { redirectTo: here })));
+  on("setpass", async () => report("Новый пароль", await sb.auth.updateUser({ password: v("password2") })));
+  on("sendlink", async () => report("Письмо со ссылкой", await sb.auth.signInWithOtp({ email: v("email"), options: { emailRedirectTo: here } })));
+  on("sendcode", async () => report("Письмо с кодом", await sb.auth.signInWithOtp({ email: v("email") })));
+  on("verifycode", async () => report("Вход по коду", await sb.auth.verifyOtp({ email: v("email"), token: v("otp"), type: "email" })));
+  on("oauth", async () => report("Переход к провайдеру", await sb.auth.signInWithOAuth({ provider: m, options: { redirectTo: here } })));
+}
+
+async function paint() {
+  const { data } = await sb.auth.getSession();
+  const s = data.session;
+  if (!s) { $("who").innerHTML = "Вы не вошли."; $("session-actions").hidden = true; $("mfa").hidden = true; return; }
+  const c = claims(s.access_token);
+  const until = new Date(c.exp * 1000).toLocaleTimeString("ru-RU");
+  $("who").innerHTML = `<span class="ok">Вы вошли</span> как <strong>${s.user.email || s.user.id}</strong><div class="muted">способ: ${(c.amr || []).map((a) => a.method).join(", ") || "—"} · уровень: ${c.aal || "—"} · короткий токен до ${until}</div>`;
+  $("session-actions").hidden = false; $("mfa").hidden = false;
+}
+
+async function start() {
+  try { cfg = await (await fetch("config.json", { cache: "no-store" })).json(); }
+  catch { $("who").innerHTML = '<span class="bad">Нет config.json — сайт не настроен.</span>'; return; }
+  const t = TITLES[cfg.method] || ["Проверка входа", ""];
+  $("title").textContent = "Проверка входа: " + t[0];
+  $("subtitle").textContent = t[1] + " База: " + (cfg.database || "—") + ".";
+  document.title = t[0] + " — проверка входа";
+
+  // Ошибка, с которой сервер вернул человека (отказ провайдера, просроченная ссылка).
+  const back = new URLSearchParams(location.hash.slice(1) || location.search.slice(1));
+  if (back.get("error") || back.get("error_code")) log("Возврат с ошибкой", Object.fromEntries(back), true);
+
+  sb = supabase.createClient(cfg.url, cfg.key);
+  sb.auth.onAuthStateChange((event) => {
+    log("Событие: " + event);
+    if (event === "PASSWORD_RECOVERY" && $("newpass")) $("newpass").hidden = false;
+    paint();
+  });
+  renderForm();
+  await paint();
+
+  $("logout").onclick = async () => report("Выход", await sb.auth.signOut());
+  $("refresh").onclick = async () => report("Продление сессии", await sb.auth.refreshSession());
+  $("mfa-list").onclick = async () => { const r = await sb.auth.mfa.listFactors(); r.error ? report("Факторы", r) : log("Факторы", r.data.all.map((x) => ({ id: x.id, status: x.status }))); };
+  $("mfa-enroll").onclick = async () => {
+    const r = await sb.auth.mfa.enroll({ factorType: "totp", friendlyName: "test-" + Date.now() });
+    if (r.error) return report("Подключение второго фактора", r);
+    factorId = r.data.id;
+    $("qr").innerHTML = `<img alt="QR-код для приложения" src="${r.data.totp.qr_code}"><div class="muted">Секрет: ${r.data.totp.secret}</div>`;
+    $("mfa-code-wrap").hidden = false; $("mfa-verify-row").hidden = false;
+    log("Второй фактор: отсканируйте QR и введите код");
+  };
+  $("mfa-verify").onclick = async () => {
+    if (!factorId) { const l = await sb.auth.mfa.listFactors(); factorId = l.data && l.data.totp[0] && l.data.totp[0].id; }
+    const r = await sb.auth.mfa.challengeAndVerify({ factorId, code: $("mfa-code").value.trim() });
+    if (r.error) return report("Код второго фактора", r);
+    log("Код принят", { aal: claims(r.data.access_token).aal }); paint();
+  };
+}
+start();
+</script>
+</body>
+</html>
