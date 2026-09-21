@@ -158,7 +158,10 @@ async function start() {
     const r = await sb.auth.mfa.enroll({ factorType: "totp", friendlyName: "test-" + Date.now() });
     if (r.error) return report("Подключение второго фактора", r);
     factorId = r.data.id;
-    $("qr").innerHTML = `<img alt="QR-код для приложения" src="${r.data.totp.qr_code}"><div class="muted">Секрет: ${r.data.totp.secret}</div>`;
+    // Адрес картинки — свойством, не строкой в разметке: в SVG есть кавычки.
+    const img = new Image(); img.alt = "QR-код для приложения"; img.src = r.data.totp.qr_code;
+    const note = document.createElement("div"); note.className = "muted"; note.textContent = "Секрет: " + r.data.totp.secret;
+    $("qr").replaceChildren(img, note);
     $("mfa-code-wrap").hidden = false; $("mfa-verify-row").hidden = false;
     log("Второй фактор: отсканируйте QR и введите код");
   };
